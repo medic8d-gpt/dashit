@@ -1,50 +1,107 @@
-# dashit API
+# LexKYNews Monorepo
 
-A lightweight FastAPI service over the `rss_data` SQLite database with helpers to run scrapers and post to Reddit via the existing `news_manager.py`.
+FastAPI backend + React (Vite) frontend for LexKYNews. This repo contains the API, scraping helpers, and the static website used in production.
+
+## Stack
+
+- API: Python 3.12+, FastAPI, SQLite
+- Web: Node 20+, React 18, Vite
+- Ops: Nginx, systemd
+
+## Repository structure
+
+```
+.
+├─ api/                # FastAPI app (routers, models, db)
+├─ web/                # Public React site (Vite) — currently deployed
+├─ frontend/           # Older/experimental React app (not deployed)
+├─ tools/              # Utilities (e.g., export_openapi.py)
+├─ deploy/             # Ops (e.g., systemd unit)
+├─ docs/               # OpenAPI and request examples
+├─ feed_scraper.py     # Scraper entrypoint
+├─ news_manager.py     # Posting/management helpers
+├─ requirements.txt    # API deps
+├─ .env(.example)      # Environment config
+└─ README.md
+```
+
+Production (server):
+
+- Nginx root: `/var/www/lexkynews.com/html` (serves built `web/dist`)
+- Backups: `/var/www/lexkynews.com/backups/`
+- Nginx site: `/etc/nginx/sites-available/lexkynews.com` (SPA fallback + `/api/` proxy)
 
 ## Quickstart
 
-- Python 3.10+
-- Create and populate `.env` (see `.env.example`), or ensure `DB_PATH` points to your SQLite file. Default is `dashit/rss_feed_data.db`.
+API (dev):
 
-Install deps and run:
-
-```
+```bash
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+cp -n .env.example .env  # edit as needed
 uvicorn api.main:app --reload --app-dir .
+# http://127.0.0.1:8000/docs
 ```
 
-Now open: `http://127.0.0.1:8000/docs`
+Web (dev):
 
-## Endpoints
+```bash
+cd web
+npm ci
+npm run dev
+# http://localhost:5173
+```
 
-- GET `/articles`: list with filters (`limit`, `offset`, `posted`, `source`, `q`, `from`, `to`, `sort`)
-- GET `/articles/{id}`: fetch one
-- GET `/articles/hash/{hash}`: by unique hash
-- GET `/articles/unposted` and `/articles/posted`
-- GET `/articles/source/{source}`
-- POST `/articles`: create (computes hash like `NewsManager`)
-- PATCH `/articles/{id}`: partial update
-- DELETE `/articles/{id}`: delete
+## Environment
 
-- POST `/scrape`: run all scrapers
-- POST `/scrape/{source}`: one of `rss`, `lexington_gov`, `wkyt`, `wkyt_questions`, `newsapi`, `civiclex`, `central_bank`, `newsdata_apis`
-- POST `/reddit/post-unposted?limit=5`: post queue to Reddit
-- POST `/reddit/post/{id}`: post a specific article
-- POST `/articles/{id}/mark-posted?posted=1`: set posted flag without Reddit
+- Copy `.env.example` to `.env` and set variables. Important:
+  - `DB_PATH` — path to SQLite DB (defaults to `dashit/rss_feed_data.db`)
+  - Any scraper/Reddit creds used by `news_manager.py`
 
-- GET `/sources`: distinct sources
-- GET `/stats`: totals and by-source counts
-- GET `/health`: health check
-- GET `/version`: app version
+## Build & deploy
 
-## Notes
+Web (static site):
 
-- The API reads/writes the `rss_data` table with columns: `id, hash, source, url, headline, summary, published, posted`.
-- The scrapers and Reddit posting use `dashit/news_manager.py`; ensure its environment variables are configured in `.env`.
-- If you keep two DBs in your workspace, set `DB_PATH` explicitly to avoid confusion.
+```bash
+cd web
+npm ci
+npm run build
+# Deploy contents of web/dist/ to /var/www/lexkynews.com/html
+```
 
-## Dev Tips
+API (service):
 
-- Run with a different DB: `DB_PATH=/full/path/to/rss_feed_data.db uvicorn api.main:app --reload --app-dir .`
-- The OpenAPI docs are at `/docs` and `/openapi.json`.
+```bash
+# Dev
+uvicorn api.main:app --host 0.0.0.0 --port 4000 --app-dir .
+
+# Systemd (example unit in deploy/lexkynews-api.service)
+# Copy, edit paths/env, then enable & start
+```
+
+Nginx (SPA + API proxy): `location / { try_files $uri $uri/ /index.html; }` and `location /api/ { proxy_pass http://127.0.0.1:4000/; }`.
+
+## API overview
+
+Key routes (see `docs/openapi.json` and `/docs`):
+
+- Articles CRUD, filters, posted/unposted
+- Scrape endpoints (rss, lexington_gov, wkyt, civiclex, etc.)
+- Reddit posting helpers
+- `/sources`, `/stats`, `/health`, `/version`
+
+## Branching — should we use branches?
+
+Yes. Keep `main` stable; use short‑lived feature branches.
+
+Minimal flow:
+
+```bash
+git switch -c feature/my-change
+# edit code
+git add -A && git commit -m "feat: describe change"
+git push -u origin feature/my-change
+# open a PR into main
+```
+
+You can push to `main` for small, low‑risk edits, but PRs are preferred for review and rollback safety.
