@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodic deploy of LexKYNews web frontend (hourly)
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+AccuracySec=5m
+Unit=lexkynews-web-deploy.service
+
+[Install]
+WantedBy=timers.target

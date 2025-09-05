@@ -1,0 +1,19 @@
+[Unit]
+Description=Build and deploy LexKYNews web frontend
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/lexnews/projects/dashit
+ExecStart=/home/lexnews/projects/dashit/scripts/deploy_web.sh
+User=lexnews
+Group=lexnews
+# Restrict privileges
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/www/lexkynews.com/html /var/www/lexkynews.com/deploys
+
+[Install]
+WantedBy=multi-user.target
