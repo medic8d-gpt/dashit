@@ -889,7 +889,6 @@ class NewsManager:
             )
             if self.post_to_reddit(post_id, url, headline, source):
                 posted_count += 1
-                posted_count += 1
                 # Rate limiting - wait between posts
                 time.sleep(2)
 
