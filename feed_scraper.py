@@ -10,11 +10,12 @@ from datetime import datetime, timedelta
 import dateutil.parser as parser
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 import praw
 import logging
 import os
 import argparse
+import unicodedata
 import time
 import re
 from dotenv import load_dotenv
@@ -87,6 +88,10 @@ FLAIR_IDS = {
     "homeless": os.getenv("FLAIR_ID_HOMELESS"),
 }
 
+# Blocklists (comma-separated)
+BLOCKED_SOURCES = {s.strip().lower() for s in (os.getenv("REDDIT_BLOCKED_SOURCES", "").split(",") or []) if s.strip()}
+BLOCKED_DOMAINS = {s.strip().lower() for s in (os.getenv("REDDIT_BLOCKED_DOMAINS", "").split(",") or []) if s.strip()}
+
 # Set up logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -94,6 +99,28 @@ logging.basicConfig(
 
 
 class NewsManager:
+    @staticmethod
+    def _sanitize_title(text: str) -> str:
+        """Convert fancy punctuation to ASCII and strip unsupported chars for safe HTTP headers/body.
+
+        Reddit supports Unicode, but some stacks (headers or intermediates) can choke on non-Latin-1.
+        This maps common punctuation and then falls back to ASCII via NFKD.
+        """
+        replacements = {
+            "\u2018": "'",  # ‘
+            "\u2019": "'",  # ’
+            "\u201C": '"',  # “
+            "\u201D": '"',  # ”
+            "\u2013": "-",  # –
+            "\u2014": "-",  # —
+            "\u2026": "...",  # …
+            "\u00A0": " ",  # non-breaking space
+        }
+        for k, v in replacements.items():
+            text = text.replace(k, v)
+        # Normalize and drop any remaining non-ascii
+        text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode("ascii")
+        return text
     def __init__(self):
         base_dir = os.path.dirname(__file__)
         # Absolute if provided; else resolve relative to the project root
@@ -846,7 +873,10 @@ class NewsManager:
         return self.reddit
 
     def fetch_unposted_articles(self, limit: Optional[int] = None, source: Optional[str] = None):
-        """Fetch unposted articles from database, optionally filtered by source, newest first"""
+        """Fetch unposted articles from database, optionally filtered by source, newest first.
+
+        Applies env-driven blocklists for sources/domains.
+        """
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             params = []
@@ -865,7 +895,24 @@ class NewsManager:
                 sql += " LIMIT ?"
                 params.append(limit)
             cursor.execute(sql, tuple(params))
-            return cursor.fetchall()
+            rows = cursor.fetchall()
+
+            # Apply blocklists
+            if BLOCKED_SOURCES or BLOCKED_DOMAINS:
+                filtered = []
+                for row in rows:
+                    r_id, r_url, r_headline, r_source, r_published = row
+                    if r_source and r_source.lower() in BLOCKED_SOURCES:
+                        continue
+                    try:
+                        host = urlparse(r_url).netloc.lower()
+                    except Exception:
+                        host = ""
+                    if host and any(host.endswith(d) or host == d for d in BLOCKED_DOMAINS):
+                        continue
+                    filtered.append(row)
+                rows = filtered
+            return rows
 
     def post_to_reddit(self, post_id, url, headline, source):
         """Post article to Reddit"""
@@ -877,6 +924,7 @@ class NewsManager:
 
             # Create title with source prefix
             title = f"[{source.upper()}] {headline}"
+            title = self._sanitize_title(title)
             if len(title) > 300:  # Reddit title limit
                 title = title[:297] + "..."
 
@@ -901,7 +949,7 @@ class NewsManager:
             logging.info(f"✅ Posted to Reddit: {headline[:50]}...")
             return True
 
-    except Exception as e:
+        except Exception as e:
             logging.error(f"❌ Failed to post {headline[:50]}...: {e}")
             return False
 
@@ -920,6 +968,17 @@ class NewsManager:
             print(
                 f"📅 Posting: [{source.upper()}] {headline[:50]}... (Published: {published[:16]})"
             )
+            # Skip banned sources/domains at post-time as well (defense in depth)
+            if source and source.lower() in BLOCKED_SOURCES:
+                print(f"⏭️  Skipping banned source: {source}")
+                continue
+            try:
+                host = urlparse(url).netloc.lower()
+            except Exception:
+                host = ""
+            if host and any(host.endswith(d) or host == d for d in BLOCKED_DOMAINS):
+                print(f"⏭️  Skipping banned domain: {host}")
+                continue
             if self.post_to_reddit(post_id, url, headline, source):
                 posted_count += 1
                 # Rate limiting - wait between posts
