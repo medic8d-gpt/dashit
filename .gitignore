@@ -74,6 +74,13 @@ Thumbs.db
 dump.rdb
 .venv/
 
+# SQLite journaling files (not needed in git)
+*.db-wal
+*.db-shm
+
+# Local backup archives
+backups/
+
 # Environment files (do not commit real secrets)
 .env
 .env.*
