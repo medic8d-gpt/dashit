@@ -60,7 +60,7 @@ def reddit_post_unposted(limit: int = Query(5, ge=1, le=50), source: str | None 
     return {"posted": count, "source": source}
 
 
-@router.post("/reddit/post/{id}")
+@router.post("/reddit/post/{id:int}")
 def reddit_post_one(id: int):
     # Fetch the article
     row = db.query_one(
@@ -79,7 +79,7 @@ def reddit_post_one(id: int):
     return {"posted": True, "id": id}
 
 
-@router.post("/articles/{id}/mark-posted")
+@router.post("/articles/{id:int}/mark-posted")
 def mark_posted(id: int, posted: int = Query(1, ge=0, le=1)):
     updated = db.execute("UPDATE rss_data SET posted = ? WHERE id = ?", (posted, id))
     if updated == 0:

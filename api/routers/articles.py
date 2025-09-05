@@ -192,7 +192,7 @@ def select_articles(
     return [{k: r[k] for k in cols} for r in rows]
 
 
-@router.get("/{id}", response_model=ArticleOut)
+@router.get("/{id:int}", response_model=ArticleOut)
 def get_article(id: int):
     row = db.query_one(
         "SELECT id, hash, source, url, headline, summary, published, posted FROM rss_data WHERE id = ?",
@@ -295,7 +295,7 @@ def create_article(payload: ArticleCreate):
     return _row_to_article(row)
 
 
-@router.patch("/{id}", response_model=ArticleOut)
+@router.patch("/{id:int}", response_model=ArticleOut)
 def update_article(id: int, payload: ArticleUpdate):
     row = db.query_one("SELECT * FROM rss_data WHERE id = ?", (id,))
     if not row:
@@ -323,7 +323,7 @@ def update_article(id: int, payload: ArticleUpdate):
     return _row_to_article(row)
 
 
-@router.delete("/{id}", status_code=204)
+@router.delete("/{id:int}", status_code=204)
 def delete_article(id: int):
     count = db.execute("DELETE FROM rss_data WHERE id = ?", (id,))
     if count == 0:

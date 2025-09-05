@@ -4,6 +4,7 @@ from fastapi.openapi.utils import get_openapi
 import os
 
 from .routers import articles, admin, actions
+from .routers import files
 from . import db
 
 
@@ -33,6 +34,7 @@ def create_app() -> FastAPI:
     app.include_router(admin.router)
     app.include_router(articles.router)
     app.include_router(actions.router)
+    app.include_router(files.router)
 
     # Customize OpenAPI schema: force 3.1.1 and include servers list
     def custom_openapi():
@@ -54,8 +56,16 @@ def create_app() -> FastAPI:
             ]
 
         # Optionally prefer a relative server to satisfy strict origins (e.g., GPT Actions)
-        use_relative = (os.getenv("OPENAPI_RELATIVE_SERVER", "0").lower() in {"1", "true", "yes"})
-        single_only = (os.getenv("OPENAPI_SINGLE_SERVER", "1").lower() in {"1", "true", "yes"})
+        use_relative = os.getenv("OPENAPI_RELATIVE_SERVER", "0").lower() in {
+            "1",
+            "true",
+            "yes",
+        }
+        single_only = os.getenv("OPENAPI_SINGLE_SERVER", "1").lower() in {
+            "1",
+            "true",
+            "yes",
+        }
 
         servers = []
         if use_relative:
