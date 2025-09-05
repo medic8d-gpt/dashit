@@ -54,10 +54,10 @@ def scrape_source(source: str):
 
 
 @router.post("/reddit/post-unposted")
-def reddit_post_unposted(limit: int = Query(5, ge=1, le=50)):
+def reddit_post_unposted(limit: int = Query(5, ge=1, le=50), source: str | None = Query(None)):
     nm = _get_news_manager()
-    count = nm.post_unposted_articles(limit=limit)
-    return {"posted": count}
+    count = nm.post_unposted_articles(limit=limit, source=source)
+    return {"posted": count, "source": source}
 
 
 @router.post("/reddit/post/{id}")

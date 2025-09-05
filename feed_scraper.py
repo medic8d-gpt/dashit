@@ -18,6 +18,7 @@ import argparse
 import time
 import re
 from dotenv import load_dotenv
+from typing import Optional
 
 # Load environment variables from .env file
 load_dotenv()
@@ -808,30 +809,26 @@ class NewsManager:
             self.reddit = praw.Reddit(**REDDIT_CONFIG)
         return self.reddit
 
-    def fetch_unposted_articles(self, limit=None):
-        """Fetch unposted articles from database, ordered by newest first"""
+    def fetch_unposted_articles(self, limit: Optional[int] = None, source: Optional[str] = None):
+        """Fetch unposted articles from database, optionally filtered by source, newest first"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
+            params = []
+            where = ["posted = 0"]
+            if source:
+                where.append("source = ?")
+                params.append(source)
+
+            sql = (
+                "SELECT id, url, headline, source, published FROM rss_data "
+                + "WHERE "
+                + " AND ".join(where)
+                + " ORDER BY published DESC, id DESC"
+            )
             if limit:
-                cursor.execute(
-                    """
-                    SELECT id, url, headline, source, published
-                    FROM rss_data
-                    WHERE posted = 0
-                    ORDER BY published DESC, id DESC
-                    LIMIT ?
-                """,
-                    (limit,),
-                )
-            else:
-                cursor.execute(
-                    """
-                    SELECT id, url, headline, source, published
-                    FROM rss_data
-                    WHERE posted = 0
-                    ORDER BY published DESC, id DESC
-                """
-                )
+                sql += " LIMIT ?"
+                params.append(limit)
+            cursor.execute(sql, tuple(params))
             return cursor.fetchall()
 
     def post_to_reddit(self, post_id, url, headline, source):
@@ -872,9 +869,9 @@ class NewsManager:
             logging.error(f"❌ Failed to post {headline[:50]}...: {e}")
             return False
 
-    def post_unposted_articles(self, limit=5):
-        """Post unposted articles to Reddit with rate limiting"""
-        unposted = self.fetch_unposted_articles(limit)
+    def post_unposted_articles(self, limit: int = 5, source: Optional[str] = None):
+        """Post unposted articles to Reddit with rate limiting; optionally filter by source"""
+        unposted = self.fetch_unposted_articles(limit=limit, source=source)
         posted_count = 0
 
         if not unposted:
@@ -921,6 +918,9 @@ def main():
         "--limit", type=int, default=5, help="Limit number of Reddit posts"
     )
     parser.add_argument(
+        "--source", type=str, default=None, help="Only operate on a specific source (e.g., lex18)"
+    )
+    parser.add_argument(
         "--all", action="store_true", help="Scrape and post (default if no args)"
     )
 
@@ -933,10 +933,29 @@ def main():
         args.all = True
 
     if args.scrape or args.all:
-        news_manager.scrape_all()
+        # If a specific source is given, only scrape that source when possible
+        if args.source:
+            mapping = {
+                "rss": news_manager.scrape_rss_feeds,
+                "lexington_gov": news_manager.scrape_lexington_gov_news,
+                "wkyt": news_manager.scrape_wkyt_news,
+                "wkyt_questions": news_manager.scrape_wkyt_good_questions,
+                "newsapi": news_manager.scrape_newsapi,
+                "civiclex": news_manager.scrape_civiclex_news,
+                "central_bank": news_manager.scrape_central_bank_center,
+                "newsdata_apis": news_manager.scrape_newsdata_apis,
+            }
+            fn = mapping.get(args.source.lower())
+            if fn:
+                fn()
+            else:
+                # Fallback to full scrape if unknown key provided
+                news_manager.scrape_all()
+        else:
+            news_manager.scrape_all()
 
     if args.post or args.all:
-        news_manager.post_unposted_articles(args.limit)
+        news_manager.post_unposted_articles(limit=args.limit, source=args.source)
 
 
 if __name__ == "__main__":
