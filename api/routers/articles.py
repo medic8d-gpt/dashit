@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, Any
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -9,6 +9,17 @@ from ..models import ArticleCreate, ArticleOut, ArticleUpdate
 
 
 router = APIRouter(prefix="/articles", tags=["articles"])
+
+ALLOWED_COLUMNS = [
+    "id",
+    "hash",
+    "source",
+    "url",
+    "headline",
+    "summary",
+    "published",
+    "posted",
+]
 
 
 def _row_to_article(row) -> ArticleOut:
@@ -121,6 +132,64 @@ def distinct_values(column: str, limit: int = Query(100, ge=1, le=500), offset: 
     sql = f"SELECT DISTINCT {column} AS v FROM rss_data ORDER BY v LIMIT ? OFFSET ?"
     rows = db.query_all(sql, (limit, offset))
     return [r["v"] for r in rows]
+
+
+@router.get("/select")
+def select_articles(
+    columns: str = Query(
+        "id,hash,source,url,headline,summary,published,posted",
+        description="Comma-separated columns from rss_data",
+    ),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    posted: Optional[int] = Query(None, ge=0, le=1),
+    source: Optional[str] = None,
+    q: Optional[str] = Query(None, description="Search headline/summary"),
+    date_from: Optional[str] = Query(None, alias="from"),
+    date_to: Optional[str] = Query(None, alias="to"),
+    sort: str = Query("published_desc", regex="^(published_(asc|desc)|id_(asc|desc))$"),
+):
+    # Validate requested columns
+    cols = [c.strip() for c in columns.split(",") if c.strip()]
+    invalid = [c for c in cols if c not in ALLOWED_COLUMNS]
+    if invalid:
+        raise HTTPException(status_code=400, detail=f"Unknown columns: {', '.join(invalid)}")
+    select_clause = ", ".join(cols)
+
+    # Build filters
+    clauses = []
+    params: list[Any] = []
+    if posted is not None:
+        clauses.append("posted = ?")
+        params.append(posted)
+    if source:
+        clauses.append("source = ?")
+        params.append(source)
+    if q:
+        clauses.append("(headline LIKE ? OR summary LIKE ?)")
+        like = f"%{q}%"
+        params.extend([like, like])
+    if date_from:
+        clauses.append("published >= ?")
+        params.append(date_from)
+    if date_to:
+        clauses.append("published <= ?")
+        params.append(date_to)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+
+    order = {
+        "published_desc": "published DESC, id DESC",
+        "published_asc": "published ASC, id ASC",
+        "id_desc": "id DESC",
+        "id_asc": "id ASC",
+    }[sort]
+
+    rows = db.query_all(
+        f"SELECT {select_clause} FROM rss_data {where} ORDER BY {order} LIMIT ? OFFSET ?",
+        (*params, limit, offset),
+    )
+    # Convert to list of dicts with selected keys only
+    return [{k: r[k] for k in cols} for r in rows]
 
 
 @router.get("/{id}", response_model=ArticleOut)
