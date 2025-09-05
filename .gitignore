@@ -78,3 +78,4 @@ dump.rdb
 .env
 .env.*
 !.env.example
+html/
