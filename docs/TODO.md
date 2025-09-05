@@ -3,7 +3,7 @@
 A focused, prioritized checklist to guide development. Use short branches and PRs per item.
 
 ## Now (P0)
-- [ ] Ignore SQLite temps: add `rss_feed_data.db*` to `.gitignore` to avoid noisy diffs.
+- [x] Ignore SQLite temps: add `rss_feed_data.db*` to `.gitignore` to avoid noisy diffs.
 - [ ] Health & stats endpoint: expose scrape counts, last-run timestamps, queue depth at `GET /stats`.
 - [ ] Admin actions hardening: require API key/JWT for write endpoints in `api/routers/actions.py`.
 - [ ] Stabilize scraping runs: introduce retry/backoff and source toggles in code/env.
@@ -17,7 +17,7 @@ A focused, prioritized checklist to guide development. Use short branches and PR
 ## Backend/API
 - [ ] Background jobs: queue scraping/posting (RQ/Celery) with retries and metrics.
 - [ ] Rate limiting: per-IP for public reads; stricter for actions.
-- [ ] Config cleanup: ensure `.env.example` matches `news_manager.py` and scrapers.
+- [ ] Config cleanup: ensure `.env.example` matches scraper package env vars (Reddit, API keys, DB_PATH).
 - [ ] Content archiving: store readability-processed HTML or snapshots to mitigate link rot.
 
 ## Scrapers & Sources

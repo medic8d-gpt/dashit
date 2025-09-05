@@ -56,8 +56,8 @@ npm run dev
 ## Environment
 
 - Copy `.env.example` to `.env` and set variables. Important:
-  - `DB_PATH` — path to SQLite DB (defaults to `dashit/rss_feed_data.db`)
-  - Any scraper/Reddit creds used by `news_manager.py`
+  - `DB_PATH` — path to SQLite DB (defaults: legacy `rss_feed_data.db` in repo root if present; else `database/rss_feed_data.db`)
+  - Scraper/Reddit creds (see `scraper/manager.py` for required env vars)
 
 ## Build & deploy
 
@@ -101,6 +101,24 @@ nm.post_unposted_articles(limit=5)
 ```
 
 Systemd unit updated to call `python -m scraper.cli`.
+
+Database storage now lives in `database/` (auto-created). Legacy root `rss_feed_data.db` is still used if it exists; remove or move it to adopt the new location.
+
+### Automation (systemd)
+
+Scrape + post timers (see `deploy/`):
+
+```
+sudo cp deploy/lexkynews-scrape.service /etc/systemd/system/
+sudo cp deploy/lexkynews-scrape.timer /etc/systemd/system/
+sudo cp deploy/lexkynews-post.service /etc/systemd/system/
+sudo cp deploy/lexkynews-post.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now lexkynews-scrape.timer lexkynews-post.timer
+systemctl list-timers | grep lexkynews
+```
+
+Adjust intervals in the `*.timer` files (`OnUnitActiveSec`).
 
 ## API overview
 

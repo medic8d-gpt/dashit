@@ -75,7 +75,7 @@ dump.rdb
 .venv/
 
 # Project DB (explicit ignore)
-rss_feed_data.db
+rss_feed_data.db*
 
 # SQLite journaling files (not needed in git)
 *.db-wal

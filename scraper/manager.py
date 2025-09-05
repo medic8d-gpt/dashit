@@ -28,7 +28,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DB_PATH = os.getenv("DB_PATH", "rss_feed_data.db")
+DB_PATH = os.getenv("DB_PATH")  # if unset we resolve below
 
 def _build_reddit_config():  # copied unchanged for now
     client_id = os.getenv("REDDIT_CLIENT_ID")
@@ -93,7 +93,14 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 class NewsManager:
     def __init__(self):
         base_dir = os.path.dirname(os.path.dirname(__file__))  # project root
-        self.db_path = DB_PATH if os.path.isabs(DB_PATH) else os.path.abspath(os.path.join(base_dir, DB_PATH))
+        if DB_PATH:
+            self.db_path = DB_PATH if os.path.isabs(DB_PATH) else os.path.abspath(os.path.join(base_dir, DB_PATH))
+        else:
+            legacy = os.path.abspath(os.path.join(base_dir, "rss_feed_data.db"))
+            database_dir = os.path.abspath(os.path.join(base_dir, "database"))
+            os.makedirs(database_dir, exist_ok=True)
+            preferred = os.path.join(database_dir, "rss_feed_data.db")
+            self.db_path = legacy if os.path.exists(legacy) else preferred
         self.reddit = None
         self.create_database()
 

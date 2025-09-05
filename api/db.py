@@ -4,15 +4,17 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 
-# Resolve DB path: prefer env `DB_PATH`; else default to `rss_feed_data.db` in project root (dashit/)
+# Resolve DB path priority (when DB_PATH not set):
+# 1. Existing legacy root rss_feed_data.db (backward compatibility)
+# 2. New location: <project_root>/database/rss_feed_data.db
 def _default_db_path() -> str:
-    # Prefer a DB file in the current working directory
-    cwd_db = Path.cwd() / 'rss_feed_data.db'
-    if cwd_db.exists():
-        return str(cwd_db)
-    # Fallback: DB at project root (two levels up from this file)
-    project_root_db = Path(__file__).resolve().parent.parent / 'rss_feed_data.db'
-    return str(project_root_db)
+    project_root = Path(__file__).resolve().parent.parent
+    legacy = project_root / 'rss_feed_data.db'
+    if legacy.exists():
+        return str(legacy)
+    db_dir = project_root / 'database'
+    db_dir.mkdir(parents=True, exist_ok=True)
+    return str(db_dir / 'rss_feed_data.db')
 
 
 def get_db_path() -> str:
@@ -61,6 +63,8 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
 def connect() -> sqlite3.Connection:
     global _INIT_DONE
     path = get_db_path()
+    # Ensure parent directory exists for new default path
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     if not _INIT_DONE:

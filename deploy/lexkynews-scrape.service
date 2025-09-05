@@ -1,0 +1,14 @@
+[Unit]
+Description=LexKYNews Scraper
+After=network.target
+
+[Service]
+Type=oneshot
+User=lexnews
+Group=lexnews
+WorkingDirectory=/home/lexnews/projects/dashit
+EnvironmentFile=/etc/lexkynews/dashit.env
+ExecStart=/home/lexnews/projects/dashit/.venv/bin/python -m scraper.cli --scrape
+
+[Install]
+WantedBy=multi-user.target

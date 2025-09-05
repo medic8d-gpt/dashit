@@ -1,0 +1,10 @@
+[Unit]
+Description=Run LexKYNews Scraper periodically
+
+[Timer]
+OnBootSec=2m
+OnUnitActiveSec=15m
+Unit=lexkynews-scrape.service
+
+[Install]
+WantedBy=timers.target
