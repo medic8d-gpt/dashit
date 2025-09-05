@@ -83,6 +83,9 @@ rss_feed_data.db
 
 # Local backup archives
 backups/
+backups/archives/
+backups/db/
+backups/web/
 
 # Environment files (do not commit real secrets)
 .env
