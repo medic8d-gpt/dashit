@@ -5,7 +5,7 @@ Generate a Reddit refresh token for the bot account using OAuth (localhost redir
 Prereqs:
 - In Reddit app settings, set redirect URI to: http://127.0.0.1:8765/authorize_callback
 
-Env (preferred) or interactive prompts:
+Env (.env at repo root preferred) or interactive prompts:
 - REDDIT_CLIENT_ID
 - REDDIT_CLIENT_SECRET
 - REDDIT_USER_AGENT (e.g., "dashit/0.1 by <your_username>")
@@ -21,14 +21,28 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import praw
+import unicodedata
+from dotenv import load_dotenv
 
 
 def main():
+    # Load .env from repo root explicitly to avoid discovery issues when run from tools/
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    env_path = os.path.join(repo_root, ".env")
+    if os.path.exists(env_path):
+        load_dotenv(env_path)
+    else:
+        load_dotenv()  # fallback to default search
+
     client_id = os.getenv("REDDIT_CLIENT_ID") or input("REDDIT_CLIENT_ID: ").strip()
     client_secret = os.getenv("REDDIT_CLIENT_SECRET") or input("REDDIT_CLIENT_SECRET: ").strip()
     user_agent = os.getenv("REDDIT_USER_AGENT") or input("REDDIT_USER_AGENT: ").strip()
 
-    redirect_uri = "http://127.0.0.1:8765/authorize_callback"
+    # Sanitize UA to ASCII to satisfy header encoding requirements
+    user_agent = unicodedata.normalize("NFKD", user_agent).encode("ascii", "ignore").decode("ascii")
+
+    # Match the app's configured redirect URI exactly (per your screenshot)
+    redirect_uri = "http://localhost:8080"
     scopes = ["identity", "submit", "read"]
 
     reddit = praw.Reddit(
@@ -53,10 +67,7 @@ def main():
             from urllib.parse import urlparse, parse_qs
 
             parsed = urlparse(self.path)
-            if parsed.path != "/authorize_callback":
-                self.send_response(404)
-                self.end_headers()
-                return
+            # Accept any path since the app is configured for the domain root.
             qs = parse_qs(parsed.query)
             if "code" not in qs:
                 self.send_response(400)
@@ -80,13 +91,22 @@ def main():
     t.start()
 
     print("\nWaiting for redirect to", redirect_uri)
-    t.join(timeout=300)
+    t.join(timeout=180)
     server.server_close()
 
     code = code_holder["code"]
     if not code:
-        print("Did not receive code. Try copy/pasting the URL, or verify redirect URI.")
-        sys.exit(1)
+        print("\nDidn't receive the callback automatically.")
+        pasted = input("Paste the redirected URL (or just the 'code' param) here: ").strip()
+        if "code=" in pasted:
+            from urllib.parse import urlparse, parse_qs
+            qs = parse_qs(urlparse(pasted).query)
+            code = qs.get("code", [None])[0]
+        else:
+            code = pasted or None
+        if not code:
+            print("No code provided. Aborting.")
+            sys.exit(1)
 
     refresh = reddit.auth.authorize(code)
     print("\nYour REDDIT_REFRESH_TOKEN (store securely, not in git):\n")

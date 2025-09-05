@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 """
-Standalone poster: submit the last N unposted articles from a source (default: wtvq) to Reddit.
+Standalone poster for LEX18: submit the last N unposted LEX18 articles to Reddit as link posts.
 
 Usage:
-    python tools/post_wtvq.py            # posts last 5 from wtvq (run from repo root)
-  python tools/post_wtvq.py --limit 3  # posts last 3 from wtvq
-  python tools/post_wtvq.py --source lex18 --limit 2
-    python tools/post_wtvq.py --dry-run  # prints what would post, no Reddit calls
-    python tools/post_wtvq.py --title-style headline  # use headline only as title
+    python tools/post_lex18.py            # posts last 5 from lex18 (run from repo root)
+    python tools/post_lex18.py --limit 3  # posts last 3 from lex18
+    python tools/post_lex18.py --dry-run  # prints what would post, no Reddit calls
 
 Also works from any directory using module form (recommended):
-    python -m tools.post_wtvq --limit 3 --source wtvq --title-style headline
+    python -m tools.post_lex18 --limit 5
 
 Env required:
   REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, REDDIT_USER_AGENT,
@@ -26,7 +24,6 @@ import sqlite3
 import time
 import unicodedata
 from typing import Optional
-from urllib.parse import urlparse
 
 import praw
 from dotenv import load_dotenv
@@ -48,15 +45,8 @@ def build_reddit_config() -> dict[str, str]:
     if missing:
         raise RuntimeError("Missing env: " + ", ".join(missing))
 
-    # Sanitize user agent to ASCII to satisfy HTTP header latin-1 requirements
-    def _sanitize_header(v: str) -> str:
-        try:
-            v = v.replace("\u2013", "-").replace("\u2014", "-").replace("\u2026", "...")
-        except Exception:
-            pass
-        return unicodedata.normalize("NFKD", v).encode("ascii", "ignore").decode("ascii")
-
-    safe_ua = _sanitize_header(user_agent)
+    # Sanitize UA to ASCII for HTTP header safety
+    safe_ua = unicodedata.normalize("NFKD", user_agent).encode("ascii", "ignore").decode("ascii")
 
     cfg: dict[str, str] = {
         "client_id": client_id,  # type: ignore[arg-type]
@@ -73,6 +63,20 @@ def build_reddit_config() -> dict[str, str]:
     return cfg
 
 
+def ensure_login(reddit: praw.Reddit):
+    try:
+        _ = reddit.user.me()
+    except Exception as e:
+        msg = str(e)
+        hint = ""
+        if "401" in msg or "invalid_grant" in msg:
+            hint = (
+                " (Check app type is 'script', client id/secret and username/password match the bot, "
+                "and 2FA is OFF for the bot if using password auth.)"
+            )
+        raise RuntimeError(f"Reddit login failed: {msg}{hint}")
+
+
 def sanitize_title(text: str) -> str:
     repl = {
         "\u2018": "'", "\u2019": "'",
@@ -86,23 +90,7 @@ def sanitize_title(text: str) -> str:
     return text
 
 
-def ensure_login(reddit: praw.Reddit):
-    """Verify authentication works and raise with a clear hint if not."""
-    try:
-        _ = reddit.user.me()
-    except Exception as e:
-        msg = str(e)
-        hint = ""
-        if "401" in msg or "invalid_grant" in msg:
-            hint = (
-                " (Check that your Reddit app type is 'script', the client id/secret and username/password match the bot, "
-                "and that 2FA is OFF for the bot account if using password auth.)"
-            )
-        raise RuntimeError(f"Reddit login failed: {msg}{hint}")
-
-
 def get_flair_id(headline: str) -> Optional[str]:
-    # Mirror feed_scraper.py heuristic using env FLAIR IDs
     fid_general = os.getenv("FLAIR_ID_GENERAL")
     fid_fire = os.getenv("FLAIR_ID_FIRE")
     fid_homeless = os.getenv("FLAIR_ID_HOMELESS")
@@ -117,26 +105,24 @@ def get_flair_id(headline: str) -> Optional[str]:
 
 
 def resolve_db_path(env_path: Optional[str]) -> str:
-    # Resolve DB path relative to repo root if not absolute
     if env_path and os.path.isabs(env_path):
         return env_path
-    # repo root = parent of this file's directory (tools/..)
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(root, env_path or "rss_feed_data.db")
 
 
-def fetch_unposted(db_path: str, source: str, limit: int):
+def fetch_unposted_lex18(db_path: str, limit: int):
     with sqlite3.connect(db_path) as conn:
         cur = conn.cursor()
         cur.execute(
             """
             SELECT id, url, headline, source, published
             FROM rss_data
-            WHERE posted = 0 AND source = ?
+            WHERE posted = 0 AND source = 'lex18'
             ORDER BY published DESC, id DESC
             LIMIT ?
             """,
-            (source, limit),
+            (limit,),
         )
         return cur.fetchall()
 
@@ -156,26 +142,19 @@ def main():
         load_dotenv(env_path)
     else:
         load_dotenv()
-    ap = argparse.ArgumentParser(description="Post last N unposted items from a source to Reddit")
-    ap.add_argument("--source", default="wtvq", help="Source key (default: wtvq)")
+    ap = argparse.ArgumentParser(description="Post last N unposted items from LEX18 to Reddit")
     ap.add_argument("--limit", type=int, default=5, help="How many to post (default: 5)")
     ap.add_argument("--dry-run", action="store_true", help="Print actions without posting")
-    ap.add_argument(
-        "--title-style",
-        choices=["headline", "source_headline"],
-        default="headline",
-        help="Title format: 'headline' (default) or 'source_headline'",
-    )
     ap.add_argument("--debug", action="store_true", help="Print debug info about auth config")
     args = ap.parse_args()
 
     db_path = resolve_db_path(os.getenv("DB_PATH"))
-    items = fetch_unposted(db_path, args.source.lower(), args.limit)
+    items = fetch_unposted_lex18(db_path, args.limit)
     if not items:
-        print("No unposted items found for", args.source)
+        print("No unposted items found for LEX18")
         return
 
-    print(f"Posting {len(items)} item(s) from {args.source}…")
+    print(f"Posting {len(items)} item(s) from LEX18…")
 
     subreddit_name = os.getenv("SUBREDDIT_NAME", "newsoflexingtonky")
     cfg = build_reddit_config()
@@ -189,11 +168,7 @@ def main():
 
     posted = 0
     for post_id, url, headline, source, published in items:
-        if args.title_style == "headline":
-            title = headline
-        else:
-            title = f"[{source.upper()}] {headline}"
-        title = sanitize_title(title)
+        title = sanitize_title(headline)
         if len(title) > 300:
             title = title[:297] + "..."
 
