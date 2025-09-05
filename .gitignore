@@ -73,6 +73,8 @@ Thumbs.db
 *.sqlite
 dump.rdb
 .venv/
-# Keep env files tracked
-!.env
-!.env.*
+
+# Environment files (do not commit real secrets)
+.env
+.env.*
+!.env.example
