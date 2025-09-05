@@ -1,0 +1,14 @@
+[Unit]
+Description=LexKYNews Reddit Poster
+After=network.target
+
+[Service]
+Type=oneshot
+User=lexnews
+Group=lexnews
+WorkingDirectory=/home/lexnews/projects/dashit
+EnvironmentFile=/etc/lexkynews/dashit.env
+ExecStart=/home/lexnews/projects/dashit/.venv/bin/python /home/lexnews/projects/dashit/feed_scraper.py --post --limit 5 --source lex18
+
+[Install]
+WantedBy=multi-user.target

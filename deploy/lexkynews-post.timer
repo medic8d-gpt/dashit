@@ -1,0 +1,10 @@
+[Unit]
+Description=Run LexKYNews Reddit Poster periodically
+
+[Timer]
+OnBootSec=5m
+OnUnitActiveSec=30m
+Unit=lexkynews-post.service
+
+[Install]
+WantedBy=timers.target
