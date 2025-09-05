@@ -1,0 +1,78 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+package-lock.json
+yarn.lock
+.pnp.*
+.pnp.js
+
+# Build
+dist/
+build/
+.next/
+out/
+coverage/
+
+# Logs
+logs
+*.log
+*.log.*
+*.out
+*.pid
+*.gz
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.egg-info/
+.eggs/
+*.whl
+*.manifest
+*.spec
+pip-log.txt
+htmlcov/
+
+# Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
+
+# Tests
+.pytest_cache/
+.tox/
+.nox/
+.mypy_cache/
+.pyre/
+
+# Docker
+*.pid
+*.seed
+*.pid.lock
+
+# Local data
+*.sqlite3
+*.db
+*.sqlite
+dump.rdb
+.venv/
+# Keep env files tracked
+!.env
+!.env.*

@@ -1,0 +1,19 @@
+[Unit]
+Description=LexKYNews FastAPI (Uvicorn) - dashit
+After=network.target
+
+[Service]
+User=lexnews
+Group=lexnews
+WorkingDirectory=/home/lexnews/projects/dashit
+Environment=PYTHONUNBUFFERED=1
+Environment=API_BASE_URLS=https://api.lexkynews.com,https://lexkynews.com,https://lexkynews.com/api,http://127.0.0.1:4000,https://127.0.0.1
+Environment=OPENAPI_SINGLE_SERVER=1
+# Set to 1 to emit a relative server ("/") which can help strict origins
+# Environment=OPENAPI_RELATIVE_SERVER=1
+ExecStart=/home/lexnews/projects/dashit/.venv/bin/python -m uvicorn api.main:app --host 127.0.0.1 --port 4000
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

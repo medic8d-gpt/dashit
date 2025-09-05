@@ -1,0 +1,53 @@
+### Health check
+GET http://127.0.0.1:8000/health
+
+### Health check (prod)
+GET https://api.lexkynews.com/health
+
+### List sources
+GET http://127.0.0.1:8000/sources
+
+### List sources (prod)
+GET https://api.lexkynews.com/sources
+
+### Stats
+GET http://127.0.0.1:8000/stats
+
+### Stats (prod)
+GET https://api.lexkynews.com/stats
+
+### List articles (first 3)
+GET http://127.0.0.1:8000/articles?limit=3
+
+### List articles (prod)
+GET https://api.lexkynews.com/articles?limit=3
+
+### Unposted queue
+GET http://127.0.0.1:8000/articles/unposted?limit=3
+
+### Unposted queue (prod)
+GET https://api.lexkynews.com/articles/unposted?limit=3
+
+### By source example (replace source as needed)
+GET http://127.0.0.1:8000/articles/source/lex18?limit=3
+
+### By source (prod)
+GET https://api.lexkynews.com/articles/source/lex18?limit=3
+
+### Search headline/summary
+GET http://127.0.0.1:8000/articles?q=Lexington
+
+### Search headline/summary (prod)
+GET https://api.lexkynews.com/articles?q=Lexington
+
+### Trigger full scrape (requires network and env creds for some sources)
+POST http://127.0.0.1:8000/scrape
+
+### Trigger full scrape (prod)
+POST https://api.lexkynews.com/scrape
+
+### Post unposted to Reddit (limit=1) (requires Reddit creds)
+POST http://127.0.0.1:8000/reddit/post-unposted?limit=1
+
+### Post unposted to Reddit (prod)
+POST https://api.lexkynews.com/reddit/post-unposted?limit=1
