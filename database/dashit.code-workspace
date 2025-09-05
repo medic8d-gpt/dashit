@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../../../../../etc/nginx"
+		},
+		{
+			"path": "../../../../../var/www/lexkynews.com"
+		},
+		{
+			"path": "../../../../.."
+		}
+	],
+	"settings": {}
+}

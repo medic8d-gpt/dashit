@@ -1,2 +1,0 @@
-"""dashit project package."""
-
