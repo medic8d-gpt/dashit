@@ -27,14 +27,45 @@ load_dotenv()
 # If `DB_PATH` is relative, resolve relative to this repository root.
 DB_PATH = os.getenv("DB_PATH", "rss_feed_data.db")
 
-# Reddit API credentials from environment variables
-REDDIT_CONFIG = {
-    "client_id": os.getenv("REDDIT_CLIENT_ID"),
-    "client_secret": os.getenv("REDDIT_CLIENT_SECRET"),
-    "user_agent": os.getenv("REDDIT_USER_AGENT"),
-    "username": os.getenv("REDDIT_USERNAME"),
-    "password": os.getenv("REDDIT_PASSWORD"),
-}
+def _build_reddit_config():
+    """Build and validate Reddit config from env. Supports refresh token or user/pass."""
+    client_id = os.getenv("REDDIT_CLIENT_ID")
+    client_secret = os.getenv("REDDIT_CLIENT_SECRET")
+    user_agent = os.getenv("REDDIT_USER_AGENT")
+    refresh_token = os.getenv("REDDIT_REFRESH_TOKEN")
+    username = os.getenv("REDDIT_USERNAME")
+    password = os.getenv("REDDIT_PASSWORD")
+
+    missing = [k for k, v in {
+        "REDDIT_CLIENT_ID": client_id,
+        "REDDIT_CLIENT_SECRET": client_secret,
+        "REDDIT_USER_AGENT": user_agent,
+    }.items() if not v]
+    if missing:
+        raise RuntimeError(
+            "Reddit credentials missing: " + ", ".join(missing) + 
+            ". Set them in your environment or .env."
+        )
+
+    config: dict[str, str] = {
+        "client_id": client_id,  # type: ignore[arg-type]
+        "client_secret": client_secret,  # type: ignore[arg-type]
+        "user_agent": user_agent,  # type: ignore[arg-type]
+    }
+
+    # Prefer refresh token when provided; else use username/password
+    if refresh_token:
+        config["refresh_token"] = refresh_token
+    else:
+        # Require username/password when no refresh token
+        if not username or not password:
+            raise RuntimeError(
+                "Reddit credentials incomplete: provide REDDIT_REFRESH_TOKEN or both REDDIT_USERNAME and REDDIT_PASSWORD."
+            )
+        config["username"] = username
+        config["password"] = password
+
+    return config
 
 # RSS Feeds
 RSS_FEEDS = {
@@ -806,7 +837,12 @@ class NewsManager:
     def init_reddit(self):
         """Initialize Reddit connection"""
         if not self.reddit:
-            self.reddit = praw.Reddit(**REDDIT_CONFIG)
+            try:
+                config = _build_reddit_config()
+            except Exception as e:
+                logging.error(f"Reddit config error: {e}")
+                raise
+            self.reddit = praw.Reddit(**config)
         return self.reddit
 
     def fetch_unposted_articles(self, limit: Optional[int] = None, source: Optional[str] = None):
@@ -865,7 +901,7 @@ class NewsManager:
             logging.info(f"✅ Posted to Reddit: {headline[:50]}...")
             return True
 
-        except Exception as e:
+    except Exception as e:
             logging.error(f"❌ Failed to post {headline[:50]}...: {e}")
             return False
 
