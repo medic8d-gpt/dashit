@@ -7,22 +7,27 @@ from .. import db
 router = APIRouter(prefix="", tags=["actions"])
 
 
+# --- NewsManager loader (updated for refactored scraper package) ---
+try:
+    from scraper.manager import NewsManager  # type: ignore
+except Exception as e:  # pragma: no cover - import failure path
+    _nm_import_error = e
+    NewsManager = None  # type: ignore
+else:
+    _nm_import_error = None
+
+
 def _get_news_manager():
-    # Import lazily to avoid importing heavy deps if not used
-    # Provide a clear HTTP error if the optional dependency/module is missing.
-    try:
-        # Try absolute import (module in project root)
-        from news_manager import NewsManager  # type: ignore
-    except Exception:
-        try:
-            # Fallback to package-relative (when installed as a package)
-            from ...news_manager import NewsManager  # type: ignore
-        except Exception as e:  # ImportError or config error
-            raise HTTPException(
-                status_code=503,
-                detail=f"NewsManager unavailable: {e}. Ensure 'news_manager.py' and required env vars are configured.",
-            )
-    return NewsManager()
+    if NewsManager is None:  # type: ignore
+        raise HTTPException(
+            status_code=503,
+            detail=f"NewsManager unavailable (scraper package import failed): {_nm_import_error}",
+        )
+    # Lightweight singleton to avoid reinitializing DB + env per request
+    # (scraping/posting operations are still method-level)
+    if not hasattr(_get_news_manager, "_instance"):
+        _get_news_manager._instance = NewsManager()  # type: ignore[attr-defined]
+    return _get_news_manager._instance  # type: ignore[attr-defined]
 
 
 @router.post("/scrape")
@@ -69,10 +74,7 @@ def reddit_post_one(id: int):
     )
     if not row:
         raise HTTPException(status_code=404, detail="Article not found")
-
-    from ...news_manager import NewsManager
-
-    nm = NewsManager()
+    nm = _get_news_manager()
     ok = nm.post_to_reddit(row["id"], row["url"], row["headline"], row["source"])
     if not ok:
         raise HTTPException(status_code=500, detail="Reddit post failed")
