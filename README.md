@@ -10,11 +10,11 @@ FastAPI backend + React (Vite) frontend for LexKYNews. This repo contains the AP
 
 ## Repository structure
 
-```
+```bash
 .
 ├─ api/                # FastAPI app (routers, models, db)
-├─ web/                # Public React site (Vite) — currently deployed
-├─ frontend/           # Older/experimental React app (not deployed)
+├─ web/                # Public React site (Vite) — deployed (Nginx serves web/dist)
+├─ frontend/           # Deprecated (duplicate of web/). Use `web/` going forward.
 ├─ tools/              # Utilities (e.g., export_openapi.py)
 ├─ deploy/             # Ops (e.g., systemd unit)
 ├─ docs/               # OpenAPI and request examples
